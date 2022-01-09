@@ -1,0 +1,323 @@
+---
+title: "Projekt 1 Markdown"
+author: "Monika Etrych"
+date: "8.01.2022"
+output: html_document
+---
+#### Projekt stowrzony w ramach zajęć: Wstęp do Analizy Danych.
+
+# Analiza Danych
+## pytanie 1
+Jaki jest rozkład wykszatałcenia w miejscowościach (we wsiach)?
+
+```{r}
+library(dplyr)
+
+setwd("C:\\Users\\monik\\Desktop\\Wstęp")
+budzet = read.csv(file="budzety2005.csv")
+
+wyksztalcenie=budzet  %>%
+  filter(townsize=="villages")%>%
+  count(educ, sort=TRUE) %>%
+  rename(number=n) %>%
+  mutate(percent=round(number/sum(budzet$townsize=="villages")*100, 2)) %>%
+  rename(education=educ)
+  
+wyksztalcenie$education[wyksztalcenie$education == "n/a"] <- "no data"
+wyksztalcenie
+
+```
+
+1/3 osób mieszkających na wsi ma wykształcenie podstawowe. Połowa osób to osoby z wykształceniem podstawowym lub zawodowym.
+
+## pytanie 2
+Ile średnio mieszkańców mieszka w mieście(powyżej 100tys), a ile na wsi?
+
+```{r}
+mieszkancyWies=budzet %>%
+              group_by (hhno) %>%
+              filter(townsize=="villages") %>%
+              summarize(liczbaMieszkancow = max(persno))
+```
+
+```{r, echo=FALSE}
+print("Średnia liczba osób mieszkających na wsi")
+```
+
+```{r}
+round(mean(mieszkancyWies$liczbaMieszkancow, na.rm=T))
+
+mieszkancyMiasto=budzet %>%
+              group_by (hhno) %>%
+              filter(townsize=="100,000 - 199,999" ||townsize== "200,000 - 499,999" || townsize=="500,000 and over") %>%
+              summarize(liczbaMieszkancow = max(persno))
+mieszkancyMiasto
+```
+
+```{r, echo=FALSE}
+print("Średnia liczba osób mieszkających w miastach powyżej 100 tys.")
+```
+
+```{r}
+round(mean(mieszkancyMiasto$liczbaMieszkancow, na.rm=T))
+```
+
+
+## pytanie 3
+W jakim miesiącu średnio są najwyższe wydatki?
+O ile średnio wzrastają wydatki w grudniu (ile wydajemy na święta Bożego Narodzenia)?
+
+```{r}
+miesiac = budzet %>%
+  group_by(month_hh) %>%
+  summarize(mean(totexpGUS))
+miesiac
+```
+
+
+```{r, echo=FALSE}
+print("Średnie wydatki w miesiącu")
+```
+```{r}
+rok=mean(miesiac$`mean(totexpGUS)`)
+rok
+```
+```{r, echo=FALSE}
+print("Najwyższe wydatki są w grudniu, a potem we wrześniu i październiku (prawdopodobnie przez wydatki szkolne)")
+```
+```{r}
+grudzien = budzet %>%
+  filter(month_hh==12)%>%
+  select(totexpGUS)
+```
+```{r, echo=FALSE}
+print("Średnia wydatków w grudniu")
+```
+```{r}
+gr=round(mean(grudzien$totexpGUS))
+gr
+```
+```{r, echo=FALSE}
+print("Średnie wydatki w grudniu są wyższe od średnich wydatków w roku o: ")
+```
+```{r}
+round(gr-rok)
+```
+
+## pytanie 4
+Jaki jest najczęstrzy wiek osoby posiadającej własne mieszkanie?
+
+```{r}
+wiek2=budzet %>%
+  filter(owntype=="owned outright" || owntype == "owned with mortgage",
+       reltohof=="Head") %>%
+  count(age) %>%
+  rename(liczba=n) %>%
+  arrange(age)
+
+
+wiek2[which.max(wiek2$liczba), ]
+```
+
+## pytanie 4.5
+W jakim wieku są właściele nieruchomości?
+
+```{r}
+wiek = budzet %>%
+  filter(owntype=="owned outright" || owntype == "owned with mortgage",
+  reltohof=="Head") %>%
+  select(age)
+
+quantile(wiek$age, probs=c(0.25, 0.5, 0.75))
+
+```
+Najczęstrzy wiek osoby posiadającej własne mieszkanie to 57 lat. Osoby posiadające mieszkanie są w różnym wieku, nie dominują osoby starsze.
+
+
+# 5 ciekawych zadań
+###
+
+### Zadanie 1
+Na jednym wykresie liniowym narysować, jak w rozważanych latach zmieniała się oczekiwana długość życia w trzech wybranych przez Ciebie krajach.
+
+```{r,message=FALSE, results='hide'}
+library(gapminder)
+library(tidyr)
+library(dplyr)
+
+polska=gapminder %>%
+  filter(country=="Poland") %>%
+  select(lifeExp, year)
+polska
+
+dania=gapminder %>%
+  filter(country=="Denmark") %>%
+  select(lifeExp, year)
+dania
+
+vietnam = gapminder %>%
+  filter(country=="Vietnam") %>%
+  select(lifeExp, year)
+vietnam
+
+plot(polska$year, polska$lifeExp, col="red", pch = 19, xlab="rok", ylab="średnia długość życia")
+points(dania$year, dania$lifeExp, col="pink3", pch = 19)
+points(vietnam$year, vietnam$lifeExp, col="green2", pch = 19)
+
+legend(x="bottomright", legend=c("Polska", "Dania", "Wietnam"), col=c("red2", "pink", "green2"), lty=1)
+
+```
+
+Oczekiwana wartość życia we wszystkich krajach w ostatnich latach wzrosła - ludzie średnio żyjąc dłużej.
+
+
+### Zadanie 2
+Wyfiltrować dane z roku 1987 dla krajów europejskich. Dodać zmienną system, która będzie przyjmowała trzy wartości:
+RWPG dla krajów RWPG, 
+UE dla krajów Unii Europejskiej 
+oraz inne dla pozostałych krajów. 
+Następnie wyznaczyć podstawowe statystyki opisowe (średnia, mediana, odchylenie standardowe, Q1 i Q3). 
+Czy można wyciągnąć z w/w statystyk jakieś ciekawe wnioski?
+
+```{r}
+library(gapminder)
+library(tidyr)
+library(dplyr)
+
+rwpg=c("Bulgaria", "Cuba",  "Czechoslovakia", "East Germany", "Hungary", "Mongolia", "Poland", "Romania", "Soviet Union", "Vietnam")
+ue=c("Austria", "Belgium", "Bulgaria", "Croatia", "Cyprus", "Czech Republic", "Denmark", "Estonia", "Finland", "France", "Germany", "Greece", "Hungary", "Ireland", "Italy", "Latvia", "Lithuania", "Luxembourg", "Malta", "Netherlands", "Poland", "Portugal", "Romania", "Slovakia", "Slovenia", "Spain", "Sweden")
+
+kraje=gapminder %>%
+  filter(year=="1987",
+         continent=="Europe") %>%
+  mutate(system=ifelse(country %in% rwpg, "rwpg", 
+                       ifelse(country %in% ue, "ue", 
+                              "inne")))
+
+RWPG = kraje %>%
+  filter(system=="rwpg") %>%
+  select(-year, -country, -system)
+RWPG
+
+UE = kraje %>%
+  filter(system=="ue") %>%
+  select(-year, -country, -system)
+
+UE
+
+inne = kraje %>%
+  filter(system=="inne")%>%
+  select(-year, -country, -system)
+inne
+
+summary(RWPG)
+summary(UE)
+summary(inne)
+
+```
+
+### Zadanie 3
+Wśród krajów o PKB niższym od 5000$ (rozważyć dane za rok 1977), wyznaczyć po trzy kraje z Afryki, Europy i Azji, 
+w których spodziewana długość życia jest największa.
+
+```{r}
+
+library(gapminder)
+library(tidyr)
+library(dplyr)
+
+gapminder %>%
+  filter(gdpPercap<5000,
+         year==1977,
+         continent=="Asia"  | continent=="Europe" | continent=="Africa") %>%
+         group_by(continent) %>%
+         top_n(3, lifeExp) %>%
+         arrange(continent, desc(lifeExp)) %>%
+         select(-year, -pop, -gdpPercap)
+```
+
+Krajem w którym najdłużej żyje się w Afryce jest Reunion, w Europie: Bośnia i Hercegowina, a w Acji: Korea Północna
+
+### Zadanie 4
+Stworzyć funkcję, która na podstawie długości boków trójkąta odpowiada na pytanie o to, czy trójkąt jest ostrokątny, prostokątny lub rozwartokątny.
+
+```{r}
+
+trojkat <- function(a, b, c)
+{
+  #ustawienie najdluzszego boku
+  boki=c(a, b, c)
+  c=max(boki)
+  
+  if(a!=b & b!=c & a!=c | a==b | a==c | b==c)
+  {
+    c=max(boki)
+    boki = boki[! boki %in% c(c)] #usuwa max bok z listy boków
+  }
+  
+  a=boki[1] 
+  b=boki[2]
+  
+  #wyznacznie kata
+  cosinus=(c^2-a^2-b^2)/(-2*a*b)
+  alfa= 180 * acos(cosinus) / pi #zamiana na stopnie
+  alfa
+  if(alfa<90)
+  {
+    print("trójkąt ostrokątny")
+  }  
+  else if(alfa==90)
+  {
+    print("trójkąt prostokątny")
+  }
+  else
+  {
+    print("trójkąt rozwartokątny")
+  }
+}
+trojkat(15,10,11)
+trojkat(3,4,5)
+trojkat(5,5,7)
+
+```
+
+
+### Zadanie 5
+Stworzyć funkcję, która na podstawie długości boków trójkąta, wyznacza jego pole. 
+Zadbaj o to, by funkcja wyświetliła komunikat, jeśli podane długości boków nie tworzą trójkąta.
+
+```{r warning=FALSE}
+trojkat2 = function(a,b,c)
+{
+  #ustawienie najdluzszego boku
+  boki=c(a, b, c)
+  if(a!=b & b!=c & a!=c | a==b & a<c | a==c & a<b | b==c & b<a) #kazda inna| dwa małe takie same i jeden większy
+  {
+    c=max(boki)
+    boki = boki[! boki %in% c(c)] #usuwa najdłuższy bok z listy boków
+  }
+  else if (a==b & a>c | a==c & a>b | b==c & b>a) #dwa takie same duże boki i jeden krótszy
+  {
+    print("Podane boki nie tworzą trójkąta.")
+    return()
+  }
+  a=boki[1]
+  b=boki[2]
+  
+  if(a+b <= c)
+  {
+    print("Podane boki nie tworzą trójkąta.")
+    return()
+  }
+  else
+  {
+    p=(a+b+c)/2
+    pole=sqrt(p*(p-a)*(p-b)*(p-c))
+    pole
+  }
+}
+trojkat2(5,4,3)
+trojkat2(4,4,4)
+trojkat2(1,2,3)
+trojkat2(5,5,3)
+```
